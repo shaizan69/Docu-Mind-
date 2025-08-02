@@ -1,0 +1,7 @@
+openai
+sentence-transformers
+faiss-cpu
+PyPDF2
+markdown
+typer
+python-dotenv 
