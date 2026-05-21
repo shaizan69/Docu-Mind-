@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 
 // SVG Icons as components
 const BookIcon = () => (
@@ -37,8 +37,12 @@ function App() {
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [hasDocuments, setHasDocuments] = useState(false)
+  const [cursorPos, setCursorPos] = useState({ x: 50, y: 50 })
+  const [isSending, setIsSending] = useState(false)
+  const [showRipple, setShowRipple] = useState(false)
   const messagesEndRef = useRef(null)
   const textareaRef = useRef(null)
+  const appRef = useRef(null)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -56,9 +60,25 @@ function App() {
     }
   }, [inputValue])
 
+  // Cursor tracking for background effect
+  const handleMouseMove = useCallback((e) => {
+    if (appRef.current) {
+      const rect = appRef.current.getBoundingClientRect()
+      const x = ((e.clientX - rect.left) / rect.width) * 100
+      const y = ((e.clientY - rect.top) / rect.height) * 100
+      setCursorPos({ x, y })
+    }
+  }, [])
+
   const handleSubmit = async (e) => {
-    e.preventDefault()
+    e?.preventDefault()
     if (!inputValue.trim() || isLoading) return
+
+    // Trigger send animation
+    setIsSending(true)
+    setShowRipple(true)
+    
+    setTimeout(() => setShowRipple(false), 600)
 
     const userMessage = { role: 'user', content: inputValue.trim() }
     setMessages(prev => [...prev, userMessage])
@@ -82,7 +102,6 @@ function App() {
 
       const data = await response.json()
       
-      // Remove typing indicator and add actual response
       setMessages(prev => {
         const filtered = prev.filter(m => !m.isTyping)
         return [...filtered, { role: 'assistant', content: data.answer || data.error || 'No response received.' }]
@@ -95,6 +114,7 @@ function App() {
     }
 
     setIsLoading(false)
+    setIsSending(false)
   }
 
   const handleKeyDown = (e) => {
@@ -105,7 +125,22 @@ function App() {
   }
 
   return (
-    <div className="app">
+    <div 
+      className="app" 
+      ref={appRef}
+      onMouseMove={handleMouseMove}
+      style={{
+        '--cursor-x': `${cursorPos.x}%`,
+        '--cursor-y': `${cursorPos.y}%`
+      }}
+    >
+      {/* Dynamic cursor-following background */}
+      <div className="cursor-glow" />
+      <div className="cursor-glow cursor-glow-2" />
+      
+      {/* Ripple effect on send */}
+      {showRipple && <div className="send-ripple" />}
+
       {/* Header */}
       <header className="header">
         <div className="logo">
@@ -182,7 +217,7 @@ function App() {
       {/* Input Area */}
       <div className="input-area">
         <div className="input-container">
-          <form onSubmit={handleSubmit} className="input-wrapper">
+          <form onSubmit={handleSubmit} className={`input-wrapper ${isSending ? 'sending' : ''}`}>
             <textarea
               ref={textareaRef}
               className="input-field"
@@ -194,7 +229,7 @@ function App() {
             />
             <button 
               type="submit" 
-              className={`send-button ${isLoading ? 'loading' : ''}`}
+              className={`send-button ${isLoading ? 'loading' : ''} ${isSending ? 'sent' : ''}`}
               disabled={!inputValue.trim() || isLoading}
             >
               <SendIcon />
